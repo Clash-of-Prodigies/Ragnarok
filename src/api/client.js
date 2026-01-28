@@ -1,7 +1,7 @@
 import { getToken } from "../auth/tokenStore";
 import { normalizeErrorMessage } from "./errors";
 
-const BASE = (import.meta.env.VITE_RAGNAROK_BASE_URL || "").replace(/\/$/, "");
+const BASE = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "");
 
 export class ApiError extends Error {
   constructor(status, message, body) {
