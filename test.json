@@ -1,0 +1,347 @@
+{
+  "suite_id": "ragnarok-conformance-v1",
+  "base_url_env": "RAGNAROK_BASE_URL",
+  "tokens": {
+    "admin": "admin_token",
+    "hero": "hero_token",
+    "villain": "villain_token",
+    "impostor": "impostor_token"
+  },
+  "fixtures": {
+    "match_id": "test-match-001",
+    "match_type": "HouseBamzy",
+    "home_team": "Alpha Team",
+    "away_team": "Beta Team"
+  },
+  "cases": [
+    {
+      "id": "auth-001",
+      "name": "Admin endpoints require admin token",
+      "steps": [
+        {
+          "request": {
+            "method": "PUT",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "hero",
+            "json": {
+              "match_type": "${fixtures.match_type}",
+              "home_team": "${fixtures.home_team}",
+              "away_team": "${fixtures.away_team}"
+            }
+          },
+          "expect": { "status": 403 }
+        }
+      ]
+    },
+    {
+      "id": "match-001",
+      "name": "Create, list, fetch, duplicate-create fails",
+      "steps": [
+        {
+          "request": {
+            "method": "DELETE",
+            "path": "/matches",
+            "token": "admin"
+          },
+          "expect": { "status": 200 }
+        },
+        {
+          "request": {
+            "method": "PUT",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "admin",
+            "json": {
+              "match_type": "${fixtures.match_type}",
+              "home_team": "${fixtures.home_team}",
+              "away_team": "${fixtures.away_team}"
+            }
+          },
+          "expect": { "status": 201 }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "path": "/matches",
+            "token": "hero"
+          },
+          "expect": {
+            "status": 200,
+            "assert_json": [
+              { "op": "array_contains", "path": "$", "where": { "match_id": "${fixtures.match_id}" } }
+            ]
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "hero"
+          },
+          "expect": {
+            "status": 200,
+            "assert_json": [
+              { "op": "eq", "path": "$.match_id", "value": "${fixtures.match_id}" }
+            ]
+          }
+        },
+        {
+          "request": {
+            "method": "PUT",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "admin",
+            "json": {
+              "match_type": "${fixtures.match_type}",
+              "home_team": "${fixtures.home_team}",
+              "away_team": "${fixtures.away_team}"
+            }
+          },
+          "expect": { "status": 400 }
+        }
+      ]
+    },
+    {
+      "id": "flow-001",
+      "name": "Initialize, start, question cooldown gating",
+      "steps": [
+        {
+          "request": {
+            "method": "PATCH",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "admin",
+            "json": { "state": 1 }
+          },
+          "expect": { "status": 200 }
+        },
+        {
+          "request": {
+            "method": "PATCH",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "admin",
+            "json": { "state": 2 }
+          },
+          "expect": { "status": 200 }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "path": "/matches/${fixtures.match_id}/current-question",
+            "token": "hero"
+          },
+          "expect": {
+            "status": 400,
+            "capture": [
+              { "name": "cooldown_error", "path": "$.error" }
+            ]
+          }
+        },
+        {
+          "action": {
+            "type": "wait_from_try_again_at",
+            "from_capture": "cooldown_error"
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "path": "/matches/${fixtures.match_id}/current-question",
+            "token": "hero"
+          },
+          "expect": {
+            "status": 200,
+            "capture": [
+              { "name": "question_duration", "path": "$.question.duration" }
+            ],
+            "assert_json": [
+              {"op":"exists", "path": "$.question.id"},
+              { "op": "exists", "path": "$.question.text" },
+              { "op": "exists", "path": "$.question.sentDate" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "answer-001",
+      "name": "Last-answer-wins behavior (correct then incorrect yields no correct answer)",
+      "steps": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "hero",
+            "json": { "selected_option": 0 }
+          },
+          "expect": { "status": 200 }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "hero",
+            "json": { "selected_option": 9999 }
+          },
+          "expect": { "status": 200 }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "path": "/matches/${fixtures.match_id}/verify-answers",
+            "token": "villain"
+          },
+          "expect": {
+            "status": 400,
+            "capture": [ { "name": "verify_error", "path": "$.error" } ]
+          }
+        },
+        {
+          "action": { "type": "wait_from_try_again_at", "from_capture": "verify_error" }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "path": "/matches/${fixtures.match_id}/verify-answers",
+            "token": "hero"
+          },
+          "expect": {
+            "status": 200,
+            "assert_json": [
+              { "op": "eq", "path": "$.correct_answers.length()", "value": 0 }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "verify-001",
+      "name": "Verify is idempotent for already-graded questions, and does not change scores",
+      "steps": [
+        {
+          "request": {
+            "method": "GET",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "hero"
+          },
+          "expect": {
+            "status": 200,
+            "capture": [
+              { "name": "home_score_before", "path": "$.home_score" },
+              { "name": "away_score_before", "path": "$.away_score" }
+            ]
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "path": "/matches/${fixtures.match_id}/verify-answers?id=q-2-10",
+            "token": "hero"
+          },
+          "expect": { "status": 200 }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "hero"
+          },
+          "expect": {
+            "status": 200,
+            "assert_json": [
+              { "op": "eq", "path": "$.home_score", "value_from_capture": "home_score_before" },
+              { "op": "eq", "path": "$.away_score", "value_from_capture": "away_score_before" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "state-001",
+      "name": "Pause behavior and post-end behavior",
+      "steps": [
+        {
+          "request": {
+            "method": "PATCH",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "admin",
+            "json": { "state": 1 }
+          },
+          "expect": { "status": 200 }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "path": "/matches/${fixtures.match_id}/current-question",
+            "token": "hero"
+          },
+          "expect": { "status": 400 }
+        },
+        {
+          "request": {
+            "method": "PATCH",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "admin",
+            "json": { "state": 99 }
+          },
+          "expect": { "status": 400 }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "hero",
+            "json": { "selected_option": 0 }
+          },
+          "expect": { "status": 400 }
+        },
+        {
+          "request": {
+            "method": "PATCH",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "admin",
+            "json": { "state": 2 }
+          },
+          "expect": {
+            "status": 400,
+            "capture": [ { "name": "resume_error", "path": "$.error" } ]
+          }
+        },
+        {
+          "action": { "type": "wait_from_try_again_at", "from_capture": "resume_error" }
+        },
+        {
+          "request": {
+            "method": "PATCH",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "admin",
+            "json": { "state": 2 }
+          },
+          "expect": {
+            "status": 200
+          }
+        },
+        {
+          "request": {
+            "method": "PATCH",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "admin",
+            "json": { "state": 99 }
+          },
+          "expect": { "status": 200 }
+        }
+      ]
+    },
+    {
+      "id": "cleanup-001",
+      "name": "Cleanup test match",
+      "steps": [
+        {
+          "request": {
+            "method": "DELETE",
+            "path": "/matches/${fixtures.match_id}",
+            "token": "admin"
+          },
+          "expect": { "status": 200 }
+        }
+      ]
+    }
+  ]
+}
