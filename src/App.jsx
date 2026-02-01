@@ -7,6 +7,8 @@ import MatchRoom from "./pages/MatchRoom";
 import Rules from "./pages/Rules";
 import SettingsMenu from "./components/SettingsMenu";
 
+import { setToken } from "./auth/tokenStore";
+
 function HeaderLink({ to, label }) {
   const location = useLocation();
   const active = location.pathname === to || (to === "/matches" && location.pathname.startsWith("/matches"));
@@ -25,7 +27,7 @@ function HeaderLink({ to, label }) {
 
 export default function App() {
   const APP_PAGE_URL = import.meta.env.VITE_APP_PAGE_URL || 'https://app.clashofprodigies.com';
-
+  setToken();
   return (
     <AppShell header={{ height: 'fit' }} padding="md">
       <AppShell.Header>

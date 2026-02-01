@@ -291,11 +291,11 @@ export default function Matches() {
 
   const teams = useMemo(
     () => [
-      { name: "Alpha House", country: "DSU" },
-      { name: "Sigma House", country: "DSU" },
-      { name: "Vector House", country: "DSU" },
-      { name: "Nova House", country: "DSU" },
-      { name: "Cipher House", country: "DSU" },
+      { name: "Genesis Gens", country: "Nigeria" },
+      { name: "Tachyon Team", country: "Nigeria" },
+      { name: "Styx Sisters", country: "Nigeria" },
+      { name: "Nephthys Wings", country: "Nigeria" },
+      { name: "Cipher Club", country: "Nigeria" },
     ],
     []
   );
@@ -322,9 +322,8 @@ export default function Matches() {
     []
   );
 
-  // Center column match groups (replace with your backend data later)
-  const groups_filtered_type = useMemo(() => {
-    const base = [
+    const unfiltered_groups = useMemo(() => {
+      const base = [
       {
         type: "intrahouse",
         house: "House of Odin",
@@ -345,16 +344,10 @@ export default function Matches() {
         ],
       },
     ];
-    
-    if (competition_type.toLocaleLowerCase() === "all") return base;
-    return base.filter((m) => (m.type || "").toLowerCase().includes(competition_type.toLowerCase()));
-  }, [competition_type]);
-
-  const groups = useMemo(() => {
     const dayStart = startOfLocalDay(calendarDates.selected);
     const dayEnd = addLocalDays(dayStart, 1);
 
-    return groups_filtered_type.map((g) => {
+    return base.map((g) => {
       const filteredMatches = g.matches.filter((match) => {
         const matchDate = new Date(match.datetime);
         return matchDate >= dayStart && matchDate < dayEnd;
@@ -362,7 +355,13 @@ export default function Matches() {
 
       return { ...g, matches: filteredMatches };
     }).filter((g) => g.matches.length > 0);
-}, [groups_filtered_type, calendarDates.selected]);
+}, [calendarDates.selected]);
+
+  // Center column match groups (replace with your backend data later)
+  const groups = useMemo(() => {
+    if (competition_type.toLocaleLowerCase() === "all") return unfiltered_groups;
+    return unfiltered_groups.filter((m) => (m.type || "").toLowerCase().includes(competition_type.toLowerCase()));
+  }, [unfiltered_groups, competition_type]);
 
 
   const filteredTeams = useMemo(() => {
