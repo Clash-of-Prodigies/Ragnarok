@@ -9,7 +9,7 @@ export default defineConfig(({mode}) => {
   const auth_page_prod_url = 'https://auth.clashofprodigies.org';
   const app_page_dev_url = 'http://clash-of-prodigies.github.io/Kitsune/';
   const app_page_prod_url = 'https://app.clashofprodigies.org/';
-  const ragnarok_page_dev_url = 'http://clash-of-prodigies.github.io/Ragnarok/';
+  const ragnarok_page_dev_url = 'http://localhost:5173/';
   const ragnarok_page_prod_url = 'https://play.clashofprodigies.org/';
 
   const backendUrl = new URL(mode==='development' ? backend_dev_url:backend_prod_url);
