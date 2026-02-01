@@ -42,17 +42,4 @@ def introspect(token_info:dict = {}):
     
 
 if __name__ == '__main__':
-    # export environment variable
-    # export admin token="supersecrettoken"
-    import os
-    os.environ['admin_token'] = 'supersecrettoken'
-    os.environ['hero_token'] = 'secrettoken1'
-    os.environ['villain_token'] = 'secrettoken2'
-    os.environ['impostor_token'] = 'secrettoken3'
-    print("Starting fake Cerberus auth service on port 5001...")
-    print("Available tokens:")
-    print(f" Admin token: {os.environ['admin_token']}")
-    print(f" Hero token: {os.environ['hero_token']}")
-    print(f" Villain token: {os.environ['villain_token']}")
-    print(f" Impostor token: {os.environ['impostor_token']}")
     app.run(port=5001, debug=True)
