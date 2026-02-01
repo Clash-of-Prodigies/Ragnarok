@@ -14,6 +14,7 @@ import {
   Title,
   UnstyledButton,
   ActionIcon,
+  Popover,
 } from "@mantine/core";
 import { DatePicker } from "@mantine/dates"
 import {
@@ -236,35 +237,53 @@ function NewsCard({ item }) {
   );
 }
 
-function formatCalendarDate(date) {
-  const currentDate = new Date();
-  const day = currentDate.getUTCDate();
-  const month = currentDate.getUTCMonth();
-  const year = currentDate.getUTCFullYear();
-  const today = new Date(year, month, day); // midnight today
-  if (date.getTime() === today.getTime()) return "Today";
-  const tomorrow = new Date(today);
-  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-  if (date.getTime() === tomorrow.getTime()) return "Tomorrow";
-  const yesterday = new Date(today);
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  if (date.getTime() === yesterday.getTime()) return "Yesterday";
-  if (!(date instanceof Date)) return "";
-  else return date.toLocaleDateString("en-US", { month: 'short', day: 'numeric', weekday: 'short' });
+function startOfLocalDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
+
+function addLocalDays(d, delta) {
+  const x = startOfLocalDay(d);
+  x.setDate(x.getDate() + delta);
+  return x;
+}
+
+function isSameLocalDay(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formatCalendarDate(date) {
+  if (!(date instanceof Date)) return "";
+
+  const today = startOfLocalDay(new Date());
+  const tomorrow = addLocalDays(today, 1);
+  const yesterday = addLocalDays(today, -1);
+
+  if (isSameLocalDay(date, today)) return "Today";
+  if (isSameLocalDay(date, tomorrow)) return "Tomorrow";
+  if (isSameLocalDay(date, yesterday)) return "Yesterday";
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    weekday: "short",
+  });
+}
+
+
 
 export default function Matches() {
   // Top segmented filter (like the sports pills in your screenshot)
   const competition_types = ["All", "Interhouse", "Intrahouse", "Extras", "Specials"];
   const [competition_type, setCompetitionType] = useState("All");
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [calendarDate, setCalendarDate] = useState(() => {
-    const curr = new Date()
-    const day = curr.getDate();
-    const month = curr.getMonth();
-    const year = curr.getFullYear();
-    return new Date(year, month, day); // midnight today
-  });
+  const [calendarDates, setCalendarDates] = useState(() => ({
+  open: false,
+  selected: startOfLocalDay(new Date()),
+}));
+
 
   // Left sidebar selection (placeholder state)
   const [search, setSearch] = useState("");
@@ -332,19 +351,19 @@ export default function Matches() {
   }, [competition_type]);
 
   const groups = useMemo(() => {
+    const dayStart = startOfLocalDay(calendarDates.selected);
+    const dayEnd = addLocalDays(dayStart, 1);
+
     return groups_filtered_type.map((g) => {
-      const filteredMatches = g.matches.filter(match => {
+      const filteredMatches = g.matches.filter((match) => {
         const matchDate = new Date(match.datetime);
-        const tomorrowCalendarDate = new Date(calendarDate);
-        tomorrowCalendarDate.setUTCDate(tomorrowCalendarDate.getUTCDate() + 1);
-        return matchDate >= calendarDate && matchDate < tomorrowCalendarDate;
+        return matchDate >= dayStart && matchDate < dayEnd;
       });
-      return {
-        ...g,
-        matches: filteredMatches,
-      };
-    }).filter(g => g.matches.length > 0);
-  }, [groups_filtered_type, calendarDate]);
+
+      return { ...g, matches: filteredMatches };
+    }).filter((g) => g.matches.length > 0);
+}, [groups_filtered_type, calendarDates.selected]);
+
 
   const filteredTeams = useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -502,56 +521,100 @@ export default function Matches() {
                 </Badge>
 
                 <Group gap="xs">
-                  <ActionIcon variant="subtle" size="lg" aria-label="Previous day"
-                  onClick={() => setCalendarDate(prev => {
-                    const d = new Date(prev);
-                    d.setUTCDate(d.getUTCDate() - 1);
-                    return d;
-                  })}>
-                    <IconChevronLeft size={18} />
-                  </ActionIcon>
-                  <Title order={4} style={{ textAlign: "center" }}>
-                    {formatCalendarDate(calendarDate)}
-                  </Title>
-                  <ActionIcon variant="subtle" size="lg" aria-label="Next day"
-                  onClick={() => setCalendarDate(prev => {
-                    const d = new Date(prev);
-                    d.setUTCDate(d.getUTCDate() + 1);
-                    return d;
-                  })}>
-                    <IconChevronRight size={18} />
-                  </ActionIcon>
-                </Group>
+  <ActionIcon
+    variant="subtle"
+    size="lg"
+    aria-label="Previous day"
+    onClick={() =>
+      setCalendarDates((prev) => ({
+        ...prev,
+        selected: addLocalDays(prev.selected, -1),
+      }))
+    }
+  >
+    <IconChevronLeft size={18} />
+  </ActionIcon>
 
-                <ActionIcon variant="light" size="lg" aria-label="Calendar" pos="relative" onClick={() => setShowCalendar((prev) => !prev)}>
-                  <IconCalendar size={18} />
-                </ActionIcon>
-                <DatePicker pos="absolute"
-                  display= {showCalendar ? 'block' : 'none'} value={calendarDate.toDateString()}
-                  onChange={(e) => {
-                    const newCalendarDate = new Date(e);
-                    const day = newCalendarDate.getUTCDate();
-                    const month = newCalendarDate.getUTCMonth();
-                    const year = newCalendarDate.getUTCFullYear();
-                    setCalendarDate(new Date(year, month, day));
-                  }}
-                  aria-label="Select date"
-                  minDate={new Date(2026, 1, 1)}
-                  maxDate={new Date(2026, 12, 31)}
-                  size="md"
-                  maw={0}
-                  variant="default"
-                  firstDayOfWeek={0}
-                  locale="en-US"
-                  styles={{
-                    day: {
-                      "&.selected-day": {
-                        backgroundColor: "rgba(255,255,255,0.1) !important",
-                        borderRadius: 8,
-                      },
-                    },
-                  }}
-                />
+  <Title order={4} style={{ textAlign: "center" }}>
+    {formatCalendarDate(calendarDates.selected)}
+  </Title>
+
+  <ActionIcon
+    variant="subtle"
+    size="lg"
+    aria-label="Next day"
+    onClick={() =>
+      setCalendarDates((prev) => ({
+        ...prev,
+        selected: addLocalDays(prev.selected, 1),
+      }))
+    }
+  >
+    <IconChevronRight size={18} />
+  </ActionIcon>
+</Group>
+
+<Popover
+  opened={calendarDates.open}
+  onChange={(open) => setCalendarDates((prev) => ({ ...prev, open }))}
+  position="bottom-end"
+  shadow="md"
+  withArrow
+  withinPortal
+>
+  <Popover.Target>
+    <ActionIcon
+      variant="light"
+      size="lg"
+      aria-label="Calendar"
+      onClick={() => setCalendarDates((prev) => ({ ...prev, open: !prev.open }))}
+    >
+      <IconCalendar size={18} />
+    </ActionIcon>
+  </Popover.Target>
+
+  <Popover.Dropdown
+    style={{
+      background: "rgba(20,20,20,0.95)",
+      border: "1px solid rgba(255,255,255,0.08)",
+      borderRadius: 12,
+      padding: 12,
+    }}
+  >
+    <DatePicker
+      value={calendarDates.selected}
+      onChange={(d) => {
+        if (!d) return;
+        const [y, m, day] = d.split("-").map(Number);
+        const d_date = new Date(y, m - 1, day);
+        setCalendarDates((prev) => ({
+          ...prev,
+          selected: startOfLocalDay(d_date),
+          open: false,
+        }));
+      }}
+      minDate={new Date(2026, 0, 1)}
+      maxDate={new Date(2026, 11, 31)}
+      firstDayOfWeek={0}
+      locale="en-US"
+      size="md"
+      styles={{
+        day: {
+          borderRadius: 10,
+          "&[dataSelected]": {
+            backgroundColor: "rgba(74, 222, 128, 0.25)",
+            border: "1px solid rgba(74, 222, 128, 0.35)",
+          },
+          "&[dataSelected]:hover": {
+            backgroundColor: "rgba(74, 222, 128, 0.30)",
+          },
+        },
+        weekday: { color: "rgba(255,255,255,0.55)" },
+        calendarHeader: { color: "rgba(255,255,255,0.85)" },
+      }}
+    />
+  </Popover.Dropdown>
+</Popover>
               </Group>
 
               {/* Groups */}
