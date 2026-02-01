@@ -8,6 +8,7 @@ import { theme } from "./theme";
 
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
+import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
