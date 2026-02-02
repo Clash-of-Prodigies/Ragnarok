@@ -37,6 +37,7 @@ class MultiChoiceQuestion(BaseQuestion):
 class HouseBamzyMatch(BaseIndividualMatch):
     def __init__(self, kwargs:dict):
         match_id = kwargs.get('match_id', '')
+        comp_info = kwargs.get('comp_info', {})
         home_team = kwargs.get('home_team', '')
         away_team = kwargs.get('away_team', '')
         home_score = kwargs.get('home_score', 0)
@@ -46,9 +47,12 @@ class HouseBamzyMatch(BaseIndividualMatch):
         scorers = kwargs.get('scorers', [])
         tpq = kwargs.get('tpq', [10.0, 20.0])  # time per question per round
         ppq = kwargs.get('ppq', 5.0)  # points per question
-        super().__init__(match_id=match_id, home_team=home_team, away_team=away_team,
+        start_time = kwargs.get('start_date', None)
+        end_time = kwargs.get('end_date', None)
+        super().__init__(match_id=match_id, comp_info=comp_info, home_team=home_team, away_team=away_team,
                 home_score=home_score, away_score=away_score,
-                rounds=rounds, state=state, scorers=scorers, tpq=tpq, ppq=ppq)
+                rounds=rounds, state=state, scorers=scorers, tpq=tpq, ppq=ppq,
+                start_time=start_time, end_time=end_time)
         self.RecessDuration:float = 120.0  # in seconds
         self.PPW:float = 50.0 # Points Per Win
         self.W2S:float = 5.0 # Within 2 Seconds Bonus

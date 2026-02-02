@@ -85,11 +85,12 @@ class BaseQuestion:
     
     
 class BaseMatch:
-    def __init__(self, match_id:str, home_team:str, away_team:str, home_score=0.0, away_score=0.0,
+    def __init__(self, match_id:str, comp_info:dict[str, str],  home_team:str, away_team:str, home_score=0.0, away_score=0.0,
                 rounds=1, state=0, scorers:list|None=None,
                 qpr=5, tpq:list[float]|None=None, ppq:float=1,
                 start_time=None, end_time=None, cooldown_duration=10):
         self.match_id: str = match_id
+        self.comp_info: dict[str, str] = comp_info
         self.home_team: str = home_team
         self.away_team:str = away_team
         self.home_score:float = home_score
@@ -103,8 +104,6 @@ class BaseMatch:
         self.qpr:int = qpr # questions per round
         self.tpq:list[float] = [] if tpq is None else tpq  # time per question per round
         self.ppq:float = ppq  # points per question
-        self.start_time:datetime | None = start_time
-        self.end_time:datetime | None = end_time
         self.cooldown_duration:timedelta = timedelta(seconds=cooldown_duration)  # in seconds
         self._verify_lock = threading.Lock()
 
@@ -118,12 +117,27 @@ class BaseMatch:
             raise ValueError("Questions per round must be a positive integer")
         if not self.tpq or len(self.tpq) < self.rounds:
             raise ValueError("Time per question list must have at least as many entries as rounds")
-    
+
+        if start_time and isinstance(start_time, str):
+            self.start_time = datetime.fromisoformat(start_time)
+        elif isinstance(start_time, datetime):
+            self.start_time = start_time
+        else:
+            self.start_time = None
+
+        if end_time and isinstance(end_time, str):
+            self.end_time = datetime.fromisoformat(end_time)
+        elif isinstance(end_time, datetime):
+            self.end_time = end_time
+        else:
+            self.end_time = None
+
     def to_dict(self):
         return {
+            **self.comp_info,
             "match_id": self.match_id,
-            "home_team": self.home_team,
-            "away_team": self.away_team,
+            "home": self.home_team,
+            "away": self.away_team,
             "home_score": self.home_score,
             "away_score": self.away_score,
             "rounds": self.rounds,
@@ -495,12 +509,12 @@ class BaseMatch:
             raise ValueError("Invalid state value")
 
 class BaseTeamMatch(BaseMatch):
-    def __init__(self, match_id, home_team, away_team, home_score=0.0, away_score=0.0,
+    def __init__(self, match_id, comp_info, home_team, away_team, home_score=0.0, away_score=0.0,
                 rounds=1, state=0, scorers=None,
                 qpr=5, tpq=None,
                 start_time=0, end_time=0,
                 home_roster=None, away_roster=None):
-        super().__init__(match_id=match_id, home_team=home_team, away_team=away_team,
+        super().__init__(match_id=match_id, comp_info=comp_info, home_team=home_team, away_team=away_team,
                         home_score=home_score, away_score=away_score,
                         rounds=rounds, state=state, scorers=[] if scorers is None else scorers,
                         qpr=qpr, tpq=[] if tpq is None else tpq,
@@ -554,11 +568,11 @@ class BaseTeamMatch(BaseMatch):
         super()._start_match()
 
 class BaseIndividualMatch(BaseMatch):
-    def __init__(self, match_id, home_team, away_team, home_score=0.0, away_score=0.0,
+    def __init__(self, match_id, comp_info, home_team, away_team, home_score=0.0, away_score=0.0,
                 rounds=1, state=0, scorers=None,
                 qpr=5, tpq=None, ppq=5,
-                start_time=0, end_time=0,):
-        super().__init__(match_id=match_id, home_team=home_team, away_team=away_team,
+                start_time=None, end_time=None,):
+        super().__init__(match_id=match_id, comp_info=comp_info, home_team=home_team, away_team=away_team,
                         home_score=home_score, away_score=away_score,
                         rounds=rounds, state=state, scorers=[] if scorers is None else scorers,
                         qpr=qpr, tpq=[] if tpq is None else tpq, ppq=ppq,
