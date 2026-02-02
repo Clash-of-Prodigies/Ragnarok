@@ -41,7 +41,10 @@ def get_match(match_id):
 
 @app.get('/matches')
 def get_all_matches():
-    return jsonify([match.to_dict() for match in ALL_MATCHES])
+    # Return all matches based on start time
+    start_time = request.args.get('date', '')
+    filtered_matches = fimbulwinter.filter_matches_by_date(ALL_MATCHES, start_time)
+    return jsonify([match.to_dict() for match in filtered_matches])
 
 def protected(role: str='user'):
     def decorator(func):

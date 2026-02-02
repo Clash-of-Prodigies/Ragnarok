@@ -1,5 +1,6 @@
 from adapters.abstract import BaseMatch
 from urllib.parse import urlparse
+from datetime import datetime
 import os
 import requests
 from flask import Request
@@ -15,6 +16,22 @@ def lookup_match_by_id(match_id: str, ALL_MATCHES: list[BaseMatch], silent:bool=
             return index
     if silent: return -1
     raise ValueError('Match not found')
+
+def filter_matches_by_date(ALL_MATCHES: list[BaseMatch], date_str: str) -> list[BaseMatch]:
+    if not date_str:
+        return ALL_MATCHES
+    filtered_matches = []
+    orig_date = datetime.fromisoformat(date_str)
+    dy, m, yr = orig_date.day, orig_date.month, orig_date.year
+    date = datetime(yr, m, dy) # normalize to midnight
+    for match in ALL_MATCHES:
+        start_time = match.start_time
+        if not start_time:
+            continue
+        match_date = datetime(start_time.year, start_time.month, start_time.day)
+        if match_date == date:
+            filtered_matches.append(match)
+    return filtered_matches
 
 def environmentals(keys:str, defaults:str, delimiter:str=',') -> str:
     key_list = keys.split(delimiter)
