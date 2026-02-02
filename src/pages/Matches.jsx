@@ -1,5 +1,4 @@
 import {
-  Badge,
   Box,
   Card,
   Container,
@@ -15,6 +14,7 @@ import {
   UnstyledButton,
   ActionIcon,
   Popover,
+  Chip,
 } from "@mantine/core";
 import { DatePicker } from "@mantine/dates"
 import {
@@ -25,7 +25,9 @@ import {
   IconChevronRight as IconRight,
   IconNews,
 } from "@tabler/icons-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { api } from "../api/client.js";
 
 /**
  * This page is intentionally mock-data driven.
@@ -62,6 +64,7 @@ function SidebarSection({ title, rightLabel, children }) {
 }
 
 function SidebarItem({ label, sublabel, leftBadge, category="", id="" }) {
+  const navigate = useNavigate();
   return (
     <UnstyledButton
       style={{
@@ -76,7 +79,7 @@ function SidebarItem({ label, sublabel, leftBadge, category="", id="" }) {
       onMouseOut={(e) => {
         e.currentTarget.style.background = "transparent";
       }}
-      onClick={() => document.location.replace(`/${category}/${id}`)}
+      onClick={() => navigate(`/${category}/${id}`)}
     >
       <Group justify="space-between" align="center" wrap="nowrap">
         <Group gap="sm" wrap="nowrap">
@@ -113,6 +116,7 @@ function SidebarItem({ label, sublabel, leftBadge, category="", id="" }) {
 }
 
 function MatchRow({ match, }) {
+  const navigate = useNavigate();
   return (
     <Paper
       withBorder
@@ -123,7 +127,7 @@ function MatchRow({ match, }) {
         borderColor: "rgba(255,255,255,0.06)",
         cursor: "pointer",
       }}
-      onClick={() => document.location.replace(`/matches/${match.id}`)}
+      onClick={() => navigate(`/matches/${match.match_id}`)}
       onMouseOver={(e) => {
         e.currentTarget.style.background = "rgba(255,255,255,0.06)";
       }}
@@ -139,7 +143,7 @@ function MatchRow({ match, }) {
             flex: "0 0 auto",
           }}
         >
-          {new Date(match.datetime).toLocaleTimeString("en-US", {
+          {new Date(match.start_time).toLocaleTimeString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
           })}
@@ -167,7 +171,7 @@ function MatchRow({ match, }) {
             }}>
               {match.home}
             </Text>
-            <Text fw={700} c="dimmed"></Text>
+            <Text fw={700} c="dimmed">{match?.state === 2? match?.home_score: ""}</Text>
           </Group>
 
           <Group gap="sm" wrap="nowrap">
@@ -191,7 +195,7 @@ function MatchRow({ match, }) {
             }}>
               {match.away}
             </Text>
-            <Text fw={700} c="dimmed"></Text>
+            <Text fw={700} c="dimmed">{match?.state === 2? match?.away_score: ""}</Text>
           </Group>
         </Stack>
       </Group>
@@ -278,11 +282,36 @@ function formatCalendarDate(date) {
 export default function Matches() {
   // Top segmented filter (like the sports pills in your screenshot)
   const competition_types = ["All", "Interhouse", "Intrahouse", "Extras", "Specials"];
-  const [competition_type, setCompetitionType] = useState("All");
+  const raw_base = useMemo(
+    () => [
+      { match_id: "m-1", datetime: "2026-02-01T23:00:00Z", home: "Alpha House", away: "Sigma House", type: "intrahouse", house: "House of Odin", sub: "Liigi Kinni", },
+      { match_id: "m-2", datetime: "2026-02-01T23:00:00Z", home: "Vector House", away: "Nova House", type: "intrahouse", house: "House of Odin", sub: "Liigi Kinni", },
+      { match_id: "m-3", datetime: "2026-01-31T23:00:00Z", home: "Cipher House", away: "Alpha House", type: "intrahouse", house: "House of Odin", sub: "Liigi Kinni", },
+      { match_id: "m-4", datetime: "2026-01-31T23:00:00Z", home: "Sigma House", away: "Nova House", type: "intrahouse", house: "House of Odin", sub: "Figagbaga Eni Merindilogun", },
+      { match_id: "m-5", datetime: "2026-02-02T23:00:00Z", home: "Vector House", away: "Cipher House", type: "intrahouse", house: "House of Odin", sub: "Figagbaga Eni Merindilogun", },
+  ], []);
+  const [competition_type, setCompetitionType] = useState({comp_type: "All", live: false});
+  const navigate = useNavigate();
   const [calendarDates, setCalendarDates] = useState(() => ({
-  open: false,
-  selected: startOfLocalDay(new Date()),
-}));
+    open: false,
+    selected: startOfLocalDay(new Date()),
+  }));
+  const [matches, setMatches] = useState(raw_base);
+
+  useEffect(() => {
+    async function fetchMatches() {
+      try {
+        const data = await api.listMatches(calendarDates.selected.toISOString());
+        console.log("Fetched matches:", data);
+        setMatches(data || []);
+      } catch (error) {
+        console.error("Failed to fetch matches:", error);
+      }
+    }
+
+    fetchMatches();
+    
+  }, [calendarDates.selected]);
 
 
   // Left sidebar selection (placeholder state)
@@ -322,45 +351,45 @@ export default function Matches() {
     []
   );
 
-    const unfiltered_groups = useMemo(() => {
-      const base = [
-      {
-        type: "intrahouse",
-        house: "House of Odin",
-        sub: "Liigi Kinni",
-        matches: [
-          { id: "m-1", datetime: "2026-02-01T23:00:00Z", home: "Alpha House", away: "Sigma House", note: "Biology, Round 1" },
-          { id: "m-2", datetime: "2026-02-01T23:00:00Z", home: "Vector House", away: "Nova House", note: "Chemistry, Round 1" },
-          { id: "m-3", datetime: "2026-01-31T23:00:00Z", home: "Cipher House", away: "Alpha House", note: "Physics, Round 1" },
-        ],
-      },
-      {
-        type: "intrahouse",
-        house: "House of Odin",
-        sub: "Figagbaga Eni Merindilogun",
-        matches: [
-          { id: "m-4", datetime: "2026-01-31T23:00:00Z", home: "Sigma House", away: "Nova House", note: "Mathematics, QF" },
-          { id: "m-5", datetime: "2026-02-02T23:00:00Z", home: "Vector House", away: "Cipher House", note: "Biology, QF" },
-        ],
-      },
-    ];
+  const unfiltered_groups = useMemo(() => {
+    const base = matches.reduce((acc, match) => {
+      let group = acc.find((g) => g.sub === match.sub);  
+      if (!group) {
+        group = {
+          house: match.house,
+          sub: match.sub,
+          comp_type: match.comp_type,
+          matches: [],
+        };
+        acc.push(group);
+      }
+      const new_match = { ...match };
+      delete new_match.house; delete new_match.sub; delete new_match.comp_type;
+      group.matches.push(new_match);
+      return acc;
+    }, []);
     const dayStart = startOfLocalDay(calendarDates.selected);
     const dayEnd = addLocalDays(dayStart, 1);
-
+    
     return base.map((g) => {
       const filteredMatches = g.matches.filter((match) => {
-        const matchDate = new Date(match.datetime);
+        const matchDate = new Date(match.start_time);
         return matchDate >= dayStart && matchDate < dayEnd;
-      });
-
+      });      
       return { ...g, matches: filteredMatches };
     }).filter((g) => g.matches.length > 0);
-}, [calendarDates.selected]);
+}, [matches, calendarDates.selected]);
 
-  // Center column match groups (replace with your backend data later)
   const groups = useMemo(() => {
-    if (competition_type.toLocaleLowerCase() === "all") return unfiltered_groups;
-    return unfiltered_groups.filter((m) => (m.type || "").toLowerCase().includes(competition_type.toLowerCase()));
+    const comp_type = competition_type?.comp_type;
+    if (comp_type.toLowerCase() === "all" && !competition_type.live) return unfiltered_groups;
+    return unfiltered_groups.map((g) => {
+      const filteredMatches = g.matches.filter((match) => {
+        return ((comp_type.toLowerCase() === "all" || g.comp_type.toLowerCase() === comp_type.toLowerCase())) &&
+               ((match.state === 2) === competition_type.live);
+      });
+      return { ...g, matches: filteredMatches };
+    }).filter((g) => g.matches.length > 0);
   }, [unfiltered_groups, competition_type]);
 
 
@@ -420,8 +449,8 @@ export default function Matches() {
       <Stack gap="md" pt="sm">
         {/* Top pills like the screenshot */}
         <SegmentedControl
-          value={competition_type}
-          onChange={setCompetitionType}
+          value={competition_type.comp_type}
+          onChange={(e) => setCompetitionType((val) => ({...val, comp_type: e}))}
           data={competition_types.map((c) => ({ label: c, value: c }))}
           radius="xl"
           w="100%"
@@ -515,9 +544,8 @@ export default function Matches() {
             <Stack gap="md">
               {/* Center header like screenshot */}
               <Group justify="space-between" align="center">
-                <Badge radius="xl" variant="light">
-                  LIVE
-                </Badge>
+                <Chip size="sm" checked={competition_type.live} icon={null}
+                onChange={() => setCompetitionType((val) => ({...val, live: !val.live}))}>Live</Chip>
 
                 <Group gap="xs">
   <ActionIcon
@@ -622,10 +650,10 @@ export default function Matches() {
                 {groups.length === 0 ? (
                   <Text size="sm" c="dimmed">No matches for the selected filter.</Text>
                 ) : (
-                  groups.map((g) => (
-                    <Stack gap="sm">
+                  groups.map((g, i) => (
+                    <Stack gap="sm" key={i}>
                       <Group justify="space-between" align="center" wrap="nowrap">
-                        <Stack gap={0} style={{ minWidth: 0, cursor: "pointer" }} onClick={() => document.location.replace(`/competitions/${g.sub.replace(/\s+/g, '-').toLowerCase()}`)}>
+                        <Stack gap={0} style={{ minWidth: 0, cursor: "pointer" }} onClick={() => navigate(`/competitions/${g.sub.replace(/\s+/g, '-').toLowerCase()}`)}>
                           <Text ta="left" fw={800}>{g.house}</Text>
                           <Text ta="left" size="sm" c="dimmed">{g.sub}</Text>
                         </Stack>

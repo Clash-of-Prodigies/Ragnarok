@@ -11,7 +11,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path, init) {
+async function request(path, kwargs, init) {
   if (!BASE) throw new Error("VITE_RAGNAROK_BASE_URL is not set");
 
   const token = getToken();
@@ -23,7 +23,13 @@ async function request(path, init) {
   if (token) headers.Authorization = `Bearer ${token}`;
   if (init?.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
 
-  const res = await fetch(`${BASE}${path}`, { ...init, headers });
+  const kwargsEntries = kwargs
+    ? Object.entries(kwargs).map(
+        ([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+      )
+    : [];
+  const url = `${BASE}${path}${kwargsEntries.length ? "?" + kwargsEntries.join("&") : ""}`;
+  const res = await fetch(url, { ...init, headers });
 
   const text = await res.text();
   let body = null;
@@ -42,7 +48,7 @@ async function request(path, init) {
 }
 
 export const api = {
-  listMatches: () => request("/matches"),
+  listMatches: (date) => request("/matches", {date: date.split('T')[0]}),
   getMatch: (matchId) => request(`/matches/${encodeURIComponent(matchId)}`),
 
   getCurrentQuestion: (matchId) =>
