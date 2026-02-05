@@ -22,18 +22,11 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconSearch,
-  IconChevronRight as IconRight,
   IconNews,
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
-
-/**
- * This page is intentionally mock-data driven.
- * You said you will refactor the logic later, so all data sources are local.
- * Replace the mock arrays with your API calls once ready.
- */
 
 function initials(name) {
   return name
