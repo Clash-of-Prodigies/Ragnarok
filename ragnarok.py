@@ -32,20 +32,6 @@ def add_cors_headers(response: Response):
         response.headers.update(standard_headers)
     return response
 
-@app.get('/matches/<match_id>')
-def get_match(match_id):
-    for match in ALL_MATCHES:
-        if match.match_id == match_id:
-            return jsonify(match.to_dict())
-    return jsonify({"error": "Match not found"}), 404
-
-@app.get('/matches')
-def get_all_matches():
-    # Return all matches based on start time
-    start_time = request.args.get('date', '')
-    filtered_matches = fimbulwinter.filter_matches_by_date(ALL_MATCHES, start_time)
-    return jsonify([match.to_dict() for match in filtered_matches])
-
 def protected(role: str='user'):
     def decorator(func):
         @wraps(func)
@@ -70,6 +56,28 @@ def protected(role: str='user'):
                 return func(*args, **kwargs)
         return wrapper
     return decorator
+
+@app.get('/matches/<match_id>')
+def get_match(match_id):
+    try:
+        mode = request.args.get('mode', 'short')
+        match_index = fimbulwinter.lookup_match_by_id(match_id=match_id, ALL_MATCHES=ALL_MATCHES)
+        match = ALL_MATCHES[match_index]
+        details = fimbulwinter.return_match_details_by_mode(match, mode)
+    except ValueError as ve:
+        return jsonify({"error": f"{ve}"}), 404
+    except Exception as e:
+        app.logger.error(f"Unexpected error in get_match: {e}")
+        return jsonify({"error": "Something went wrong"}), 500
+    else:
+        return jsonify(details), 200
+
+@app.get('/matches')
+def get_all_matches():
+    # Return all matches based on start time
+    start_time = request.args.get('date', '')
+    filtered_matches = fimbulwinter.filter_matches_by_date(ALL_MATCHES, start_time)
+    return jsonify([match.to_dict() for match in filtered_matches]), 200
 
 @app.put('/matches/<match_id>')
 @protected('admin')
@@ -149,24 +157,6 @@ def clear_all_matches(**kwargs):
    app.logger.info(f"All matches cleared by {user_name}")
    return jsonify({"message": "All matches cleared"}), 200
 
-@app.get('/matches/<match_id>/current-question')
-@protected('user')
-def current_question(match_id='', **kwargs):
-    if not match_id:
-        return jsonify({"error": "Match ID is required"}), 400
-    try:
-        match_index = fimbulwinter.lookup_match_by_id(match_id=match_id, ALL_MATCHES=ALL_MATCHES)
-        question = ALL_MATCHES[match_index].get_current_question()
-    except ValueError as ve:
-        return jsonify({"error": f"{ve}"}), 400
-    except Exception as e:
-        app.logger.error(f"Unexpected error in next_question: {e}")
-        return jsonify({"error": "Something went wrong"}), 400
-    else:
-        user_name = kwargs.get('user_name', 'unknown')
-        app.logger.info(f"Current question for match {match_id} retrieved by {user_name}")
-        return jsonify({"question": question}), 200    
-
 @app.post('/matches/<match_id>')
 @protected('user')
 def submit_answer(match_id='', **kwargs):
@@ -183,26 +173,6 @@ def submit_answer(match_id='', **kwargs):
         return jsonify({"error": "Something went wrong"}), 400
     else:
         return jsonify({"message": "Answer submitted successfully"}), 200
-
-@app.get('/matches/<match_id>/verify-answers')
-@protected('user')
-def verify_answers(match_id='', **kwargs):
-    if not match_id:
-        return jsonify({"error": "Match ID is required"}), 400
-    correct_answers = []
-    try:
-        question_id = request.args.get('id', '')
-        match_index = fimbulwinter.lookup_match_by_id(match_id=match_id, ALL_MATCHES=ALL_MATCHES)
-        correct_answers.extend(ALL_MATCHES[match_index].verify_answers(question_id))
-    except ValueError as ve:
-        return jsonify({"error": f"{ve}"}), 400
-    except Exception as e:
-        app.logger.error(f"Unexpected error in verify_answers: {e}")
-        return jsonify({"error": "Something went wrong"}), 400
-    else:
-        user_name = kwargs.get('user_name', 'unknown')
-        app.logger.info(f"Answers for match {match_id} verified by {user_name}")
-        return jsonify({"correct_answers": correct_answers}), 200
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)

@@ -20,7 +20,6 @@ Frontend fetches the next current question.
 
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
-import threading
 
 MatchState = {
     -99: "Invalid",
@@ -105,7 +104,6 @@ class BaseMatch:
         self.tpq:list[float] = [] if tpq is None else tpq  # time per question per round
         self.ppq:float = ppq  # points per question
         self.cooldown_duration:timedelta = timedelta(seconds=cooldown_duration)  # in seconds
-        self._verify_lock = threading.Lock()
 
         if not self.match_id:
             raise ValueError("Match ID cannot be empty")
@@ -224,7 +222,7 @@ class BaseMatch:
         self.questions = ([], [])
         self._fetch_questions_from_bank()
         start_time = self.start_time.isoformat() if self.start_time else ''
-        return {'success': True, 'data': {'start_time': start_time} }
+        return f"Match initialized successfully. Start time: {start_time}"
     
     def _start_match(self):
         if not self.start_time:
@@ -310,19 +308,23 @@ class BaseMatch:
             raise ValueError("Match is not active")
         if question is None:
             if not self.current_question:
-                raise ValueError("No current question to pick answers for")
+                raise ValueError("Cannot verify answers. No question available to pick answers for")
             question = self.current_question
         sentDate = question.sendDate
         if sentDate is None:
-            raise ValueError("Current question has no sent time sent yet")
+            raise ValueError("Cannot verify answers. Question has no sent time sent yet")
         duration = question.duration
         if isinstance(sentDate, datetime) and isinstance(duration, timedelta):
             if datetime.now(timezone.utc) < (sentDate + duration):
-                raise ValueError(f"Cannot verify yet. Try again at {(sentDate + duration).isoformat()}")
+                raise ValueError(f"Cannot verify answers. Try again at {(sentDate + duration).isoformat()}")
             correct_answers = question.pick_correct_answers()
             return correct_answers
         else:
-            raise ValueError("Invalid time constraints for current question")
+            raise ValueError("Cannot verify answers. Invalid sent time or duration on question")
+        
+    def get_correct_answers(self):
+        correct_answers = self._get_correct_answers()
+        return [ans.to_dict() for ans in correct_answers]
     
     def _record_correct_answers(self, correct_answers:list[BaseQuestion.Answer], points=0.0):
         if self.state != 2:
@@ -343,66 +345,39 @@ class BaseMatch:
         self.current_answers = {}
 
 
-    def verify_answers(self, id: str = ''):
+    def verify_answers_for_current_question(self):
         if self.state != 2:
             raise ValueError("Match is not active")
-        if not id:
-            if not self.current_question:
-                raise ValueError("No current question to verify")
-            id = self.current_question.question_id
+        if not self.current_question:
+            raise ValueError("Cannot verify answers. No current question available")
+        q = self.current_question
+        assert q.graded is False, "Current question has already been graded"
+        
+        # 4) Time gate
+        sentDate = q.sendDate
+        duration = q.duration
+        if sentDate is None or not isinstance(sentDate, datetime):
+            raise ValueError("Current question has no sent time set yet")
+        if not isinstance(duration, timedelta):
+            raise ValueError("Invalid duration")
 
-        with self._verify_lock:
-            # 1) If it's already in used questions, return cached (no recompute, no scoring)
-            used = self.questions[1]
-            used_q = next((q for q in used if q.question_id == id), None)
-            if used_q is not None:
-                if not used_q.graded:
-                    raise ValueError("Question exists but has not been verified yet")
-                return [ans.to_dict() for ans in used_q.answers]
+        now = datetime.now(tz=timezone.utc)
+        if now < (sentDate + duration):
+            raise ValueError(f"Cannot verify yet. Try again at {(sentDate + duration).isoformat()}")
 
-            # 2) Otherwise it must be the current question
-            if not self.current_question:
-                raise ValueError("No current question to verify")
-            if self.current_question.question_id != id:
-                raise ValueError("Question id does not match current question and was not found in used questions")
+        # 5) Grade using all submitted answers (snapshot)
+        all_answers = list(self.current_answers.values())
+        q_with_all = replace(q, answers=all_answers)
 
-            q = self.current_question
+        correct_answers = q_with_all.pick_correct_answers()
 
-            # 3) If already graded (idempotent), return cached
-            if q.graded:
-                return [ans.to_dict() for ans in q.answers]
+        # Cache results on the question and mark graded
+        q_graded = replace(q_with_all, answers=list(correct_answers), graded=True)
+        self.current_question = q_graded
 
-            # 4) Time gate
-            sentDate = q.sendDate
-            duration = q.duration
-            if sentDate is None or not isinstance(sentDate, datetime):
-                raise ValueError("Current question has no sent time set yet")
-            if not isinstance(duration, timedelta):
-                raise ValueError("Invalid duration")
-
-            now = datetime.now(tz=timezone.utc)
-            if now < (sentDate + duration):
-                raise ValueError(f"Cannot verify yet. Try again at {(sentDate + duration).isoformat()}")
-
-            # 5) Grade using all submitted answers (snapshot)
-            # IMPORTANT: MultiChoiceQuestion.pick_correct_answers reads self.answers
-            all_answers = list(self.current_answers.values())
-            q_with_all = replace(q, answers=all_answers)
-
-            correct_answers = q_with_all.pick_correct_answers()
-
-            # Cache results on the question and mark graded
-            q_graded = replace(q_with_all, answers=list(correct_answers), graded=True)
-            self.current_question = q_graded
-
-            # 6) Score + advance exactly once
-            self._record_correct_answers(list(correct_answers), points=q_graded.points)
-
-            # If your override already clears these, keep it consistent.
-            # BaseMatch._record_correct_answers currently also clears and advances.
-
-            return [ans.to_dict() for ans in correct_answers]
-
+        # 6) Score + advance exactly once
+        self._record_correct_answers(list(correct_answers), points=q_graded.points)
+        return 'Answers verified and recorded successfully'
     
     def _pause_match(self, recess:float = -1):
         if self.state != 2:
@@ -410,8 +385,9 @@ class BaseMatch:
         self.state = 1  # Standby
         recess_duration = timedelta(seconds=recess)
         if recess <= 0:
-            return
+            return "Match paused successfully without setting new start time"
         self.start_time = datetime.now(tz=timezone.utc) + recess_duration
+        return f"Match paused successfully. It will resume at {self.start_time.isoformat()}"
 
     def _update_match(self, **kwargs):
         for key, value in kwargs.items():
@@ -419,40 +395,48 @@ class BaseMatch:
                 if key == 'state':
                     continue  # state changes should go through change_match_state
                 setattr(self, key, value)
+            else:
+                raise ValueError(f"Invalid attribute: {key}")
+        return "Match updated successfully"
     
     def update_match(self, **kwargs):
+        msg = ''
         if 'state' in kwargs:
             new_state = kwargs.pop('state', self.state)
-            self._change_match_state(new_state)
+            msg = self._change_match_state(new_state)
+        elif 'verify' in kwargs:
+            msg = self.verify_answers_for_current_question()
         else:
             if self.state != -1:
                 raise ValueError("Match must be suspended to update other attributes")
-        self._update_match(**kwargs)
+        msg = self._update_match(**kwargs)
+        return msg
     
     def _suspend_match(self):
         if self.state not in [1, 2]:
             raise ValueError("Match is neither active nor standby")
         self.state = -1  # Suspended
+        return "Match suspended successfully"
 
     def _cancel_match(self):
         if self.state not in [-1, 0, 1]:
             raise ValueError("Match cannot be cancelled in its current state")
         self.state = -99  # Invalid / Cancelled
+        return "Match cancelled successfully"
 
     def _end_match(self):
         if self.state != 2:
             raise ValueError("Match is not in progress")
         if not self.end_time: self.end_time = datetime.now(tz=timezone.utc)
         self.state = 99  # Completed
+        return "Match ended successfully"
     
     def _restart_match(self):
         if self.state != 2:
             raise ValueError("Match is not active and cannot be restarted")
-        self.home_score = self.away_score = 0
-        self.scorers = []
-        self.questions = ([], [])
-        self._fetch_questions_from_bank()
+        self._initialize_match()
         self._start_match()
+        return "Match restarted successfully"
 
     def _reset_match(self):
         self.home_score = self.away_score = 0
@@ -461,6 +445,9 @@ class BaseMatch:
         self.state = 0  # Upcoming
         self.start_time = None
         self.end_time = None
+        self.current_question = None
+        self.current_answers = {}
+        return "Match reset to upcoming state successfully"
     
     def _change_match_state(self, new_state:int):
         if not isinstance(new_state, int):
@@ -471,38 +458,38 @@ class BaseMatch:
             # not allowed to revert from 'active' or 'completed' to 'upcoming'
             if self.state in [2, 99]:
                 raise ValueError("Match is already started or completed")
-            self._reset_match()
+            return self._reset_match()
         elif new_state == 1:
             if self.state == 0 or self.state == -1:
                 # from upcoming or suspended to standby
-                self._initialize_match()
+                return self._initialize_match()
             elif self.state == 2:
                 # from active to standby
-                self._pause_match()
+                return self._pause_match()
             else:
                 raise ValueError("Match must be 'upcoming' or 'active' to change to 'standby'")
         elif new_state == 2:
             if self.state == 1 or self.state == -1:
                 # from standby or suspended to active
-                self._start_match()
+                return self._start_match()
             else:
                 raise ValueError("Match must be 'standby' or 'suspended' to start")
         elif new_state == 99:
             if self.state == 2 or self.state == -1:
                 # from active or suspended to completed
-                self._end_match()
+                return self._end_match()
             else:
                 raise ValueError("Match must be 'active' or 'suspended' to complete")
         elif new_state == -1:
             if self.state == 2 or self.state == 1:
                 # from active to suspended
-                self._suspend_match()
+                return self._suspend_match()
             else:
                 raise ValueError("Match must be 'active' or 'standby' to suspend")
         elif new_state == -99:
             if self.state == -1 or self.state == 0 or self.state == 1:
                 # from suspended, upcoming, or standby to cancelled
-                self._cancel_match()
+                return self._cancel_match()
             else:
                 raise ValueError("Match must be 'suspended', 'upcoming', or 'standby' to cancel")
         else:
