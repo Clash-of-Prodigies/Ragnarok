@@ -234,7 +234,7 @@ class BaseMatch:
         if not self.home_team or not self.away_team:
             raise ValueError("Both teams must be defined to start the match")
         self._prep_current_question()
-        return {'success': True, 'data': {'start_time': self.start_time.isoformat()} }
+        return f"Match starts at {self.start_time.isoformat()}"
     
     def _get_current_question(self):
         if self.state != 2:
@@ -409,7 +409,7 @@ class BaseMatch:
         else:
             if self.state != -1:
                 raise ValueError("Match must be suspended to update other attributes")
-        msg = self._update_match(**kwargs)
+            msg = self._update_match(**kwargs)
         return msg
     
     def _suspend_match(self):

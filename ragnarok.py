@@ -132,13 +132,14 @@ def remove_match(match_id='', user_name='', **kwargs):
 @app.patch('/matches/<match_id>')
 @protected('admin')
 def update_match_state(match_id='', **kwargs):
+    resp = "Successfully changed state"
     if not match_id:
         return jsonify({"error": "Match ID is required"}), 400
     try:
         data = request.get_json() or {}
         data['match_id'] = match_id
         idx = fimbulwinter.lookup_match_by_id(match_id=match_id, ALL_MATCHES=ALL_MATCHES)
-        ALL_MATCHES[idx].update_match(**data)
+        resp = ALL_MATCHES[idx].update_match(**data)
     except ValueError as ve:
         return jsonify({"error": f"{ve}"}), 400
     except Exception as e:
@@ -147,7 +148,7 @@ def update_match_state(match_id='', **kwargs):
     else:
         user_name = kwargs.get('user_name', 'unknown')
         app.logger.info(f"Match {match_id} updated successfully by {user_name}")
-        return jsonify({"message": "Successfully changed state"}), 200
+        return jsonify({"message": resp}), 200
 
 @app.delete('/matches')
 @protected('admin')
