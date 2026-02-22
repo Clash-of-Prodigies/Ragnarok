@@ -252,10 +252,8 @@ export default function MatchRoom() {
 
   const [fetchBusy, setFetchBusy] = useState(false);
   const [submitBusy, setSubmitBusy] = useState(false);
-  const [verifyBusy, setVerifyBusy] = useState(false);
 
   const [qTryAgainAt, setQTryAgainAt] = useState(null);
-  const [verifyTryAgainAt, setVerifyTryAgainAt] = useState(null);
 
   const [verifyResult, setVerifyResult] = useState(null);
 
@@ -442,43 +440,6 @@ export default function MatchRoom() {
       notifications.show({ color: "red", message: e?.message || "Submit failed" });
     } finally {
       setSubmitBusy(false);
-    }
-  }
-
-  async function verifyAnswers() {
-    if (getPhaseFromMatch(match) !== "active") {
-      notifications.show({ color: "yellow", message: "Match is not live. Verification is only available during active matches." });
-      return;
-    }
-
-    if (!question?.id && !question?.question_id) {
-      notifications.show({ color: "yellow", message: "No current question loaded." });
-      return;
-    }
-
-    const qid = question.id || question.question_id;
-
-    setVerifyTryAgainAt(null);
-    setVerifyBusy(true);
-    try {
-      const data = await api.verifyAnswers(id, qid);
-      setVerifyResult(data);
-      notifications.show({ color: "green", message: "Verified answers." });
-      pushLog("Verified answers");
-      setQMode("results");
-      await refreshMatch();
-    } catch (e) {
-      if (e instanceof ApiError) {
-        const tryAt = extractTryAgainAt(e.message || "");
-        if (tryAt) {
-          setVerifyTryAgainAt(tryAt);
-          pushLog("Verify not ready yet, cooling down");
-          return;
-        }
-      }
-      notifications.show({ color: "red", message: e?.message || "Verify failed" });
-    } finally {
-      setVerifyBusy(false);
     }
   }
 
@@ -1161,14 +1122,13 @@ export default function MatchRoom() {
                       >
                         Submit answer
                       </Button>
-                      <Button
+                      {/*<Button
                         loading={verifyBusy}
                         variant="light"
                         onClick={verifyAnswers}
-                        disabled={!question}
-                      >
+                        disabled={!question}>
                         Verify
-                      </Button>
+                      </Button>*/}
                     </Group>
 
                     <Group gap="sm" c="dimmed">
@@ -1182,7 +1142,7 @@ export default function MatchRoom() {
                   </Group>
 
                   {/* cooldown hints */}
-                  {qTryAgainAt || verifyTryAgainAt ? (
+                  {qTryAgainAt ? (
                     <Card
                       withBorder
                       radius="lg"
@@ -1191,8 +1151,6 @@ export default function MatchRoom() {
                     >
                       <Text size="sm" c="dimmed">
                         {qTryAgainAt ? `Question cooling down, try again at ${qTryAgainAt}` : null}
-                        {qTryAgainAt && verifyTryAgainAt ? " | " : null}
-                        {verifyTryAgainAt ? `Verify cooling down, try again at ${verifyTryAgainAt}` : null}
                       </Text>
                     </Card>
                   ) : null}
