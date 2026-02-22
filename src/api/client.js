@@ -52,7 +52,7 @@ export const api = {
   getMatch: (matchId) => request(`/matches/${encodeURIComponent(matchId)}`),
 
   getCurrentQuestion: (matchId) =>
-    request(`/matches/${encodeURIComponent(matchId)}/current-question`),
+    request(`/matches/${encodeURIComponent(matchId)}?mode=extended`),
 
   submitAnswer: (matchId, selectedOption) =>
     request(`/matches/${encodeURIComponent(matchId)}`, {
@@ -60,8 +60,6 @@ export const api = {
       body: JSON.stringify({ selected_option: selectedOption }),
     }),
 
-  verifyAnswers: (matchId, questionId) =>
-    request(
-      `/matches/${encodeURIComponent(matchId)}/verify-answers?id=${encodeURIComponent(questionId)}`
-    ),
+  verifyAnswers: (matchId) =>
+    request(`/matches/${encodeURIComponent(matchId)}?mode=extended`),
 };
