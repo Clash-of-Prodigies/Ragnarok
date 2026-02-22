@@ -16,7 +16,7 @@ import {
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconRefresh, IconClock, IconNews } from "@tabler/icons-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 
@@ -378,7 +378,7 @@ export default function MatchRoom() {
     setEventLog((prev) => [{ time, text }, ...prev].slice(0, 25));
   }
 
-  async function refreshMatch() {
+  const refreshMatch = useCallback(async () => {
     setLoadingMatch(true);
     try {
       const data = await api.getMatch(id);
@@ -389,7 +389,7 @@ export default function MatchRoom() {
     } finally {
       setLoadingMatch(false);
     }
-  }
+  }, [id]);
 
   async function fetchCurrentQuestion() {
     if (getPhaseFromMatch(match) !== "active") {
@@ -444,8 +444,9 @@ export default function MatchRoom() {
   }
 
   useEffect(() => {
+    if (!id) return;
     refreshMatch();
-  }, [id]);
+  }, [id, refreshMatch]);
 
   useEffect(() => {
     const id = window.setInterval(() => setClockNow(Date.now()), 250);
@@ -458,7 +459,7 @@ export default function MatchRoom() {
     if (toStateNumber(state) !== 2) return;
     const p = window.setInterval(() => refreshMatch(), 5000);
     return () => window.clearInterval(p);
-  }, [match, state]);
+  }, [match, state, refreshMatch]);
 
   const leftNews = useMemo(
     () => [
@@ -849,9 +850,9 @@ export default function MatchRoom() {
           <Text size="sm" c="dimmed" ta="center" style={{ maxWidth: 640 }}>
             {extra}
           </Text>
-          <Button variant="light" leftSection={<IconRefresh size={16} />} onClick={refreshMatch}>
+          {/*<Button variant="light" leftSection={<IconRefresh size={16} />} onClick={refreshMatch}>
             Refresh match state
-          </Button>
+          </Button>*/}
         </Stack>
       </Card>
     );
@@ -1097,13 +1098,13 @@ export default function MatchRoom() {
                 <Title order={3}>{phaseTitle(phase)}</Title>
 
                 <Group gap="sm">
-                  <Button
+                  {/*<Button
                     variant="light"
                     leftSection={<IconRefresh size={16} />}
                     onClick={refreshMatch}
                   >
                     Refresh
-                  </Button>
+                  </Button>*/}
                 </Group>
               </Group>
 
