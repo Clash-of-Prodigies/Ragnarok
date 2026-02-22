@@ -443,10 +443,7 @@ export default function MatchRoom() {
     }
   }
 
-  useEffect(() => {
-    if (!id) return;
-    refreshMatch();
-  }, [id, refreshMatch]);
+  useEffect(() => { if (!id) return; refreshMatch(); }, [id, refreshMatch]);
 
   useEffect(() => {
     const id = window.setInterval(() => setClockNow(Date.now()), 250);
