@@ -108,7 +108,7 @@ function SidebarItem({ label, sublabel, leftBadge, category="", id="" }) {
   );
 }
 
-function MatchRow({ match, }) {
+function MatchRow({ match }) {
   const navigate = useNavigate();
   return (
     <Paper
@@ -164,7 +164,7 @@ function MatchRow({ match, }) {
             }}>
               {match.home}
             </Text>
-            <Text fw={700} c="dimmed">{match?.state === 2? match?.home_score: ""}</Text>
+            <Text fw={700} c="dimmed">{match?.state === 0 ? "": match?.home_score}</Text>
           </Group>
 
           <Group gap="sm" wrap="nowrap">
@@ -188,7 +188,7 @@ function MatchRow({ match, }) {
             }}>
               {match.away}
             </Text>
-            <Text fw={700} c="dimmed">{match?.state === 2? match?.away_score: ""}</Text>
+            <Text fw={700} c="dimmed">{match?.state === 0 ? "": match?.away_score}</Text>
           </Group>
         </Stack>
       </Group>
@@ -275,25 +275,18 @@ function formatCalendarDate(date) {
 export default function Matches() {
   // Top segmented filter (like the sports pills in your screenshot)
   const competition_types = ["All", "Interhouse", "Intrahouse", "Extras", "Specials"];
-  const raw_base = useMemo(
-    () => [
-      { match_id: "m-1", datetime: "2026-02-01T23:00:00Z", home: "Alpha House", away: "Sigma House", type: "intrahouse", house: "House of Odin", sub: "Liigi Kinni", },
-      { match_id: "m-2", datetime: "2026-02-01T23:00:00Z", home: "Vector House", away: "Nova House", type: "intrahouse", house: "House of Odin", sub: "Liigi Kinni", },
-      { match_id: "m-3", datetime: "2026-01-31T23:00:00Z", home: "Cipher House", away: "Alpha House", type: "intrahouse", house: "House of Odin", sub: "Liigi Kinni", },
-      { match_id: "m-4", datetime: "2026-01-31T23:00:00Z", home: "Sigma House", away: "Nova House", type: "intrahouse", house: "House of Odin", sub: "Figagbaga Eni Merindilogun", },
-      { match_id: "m-5", datetime: "2026-02-02T23:00:00Z", home: "Vector House", away: "Cipher House", type: "intrahouse", house: "House of Odin", sub: "Figagbaga Eni Merindilogun", },
-  ], []);
   const [competition_type, setCompetitionType] = useState({comp_type: "All", live: false});
   const navigate = useNavigate();
   const [calendarDates, setCalendarDates] = useState(() => ({
     open: false,
     selected: startOfLocalDay(new Date()),
   }));
-  const [matches, setMatches] = useState(raw_base);
+  const [matches, setMatches] = useState([]);
 
   useEffect(() => {
     async function fetchMatches() {
       try {
+        console.log("Fetching matches for date:",calendarDates.selected, calendarDates.selected.toISOString());
         const data = await api.listMatches(calendarDates.selected.toISOString());
         console.log("Fetched matches:", data);
         setMatches(data || []);
@@ -309,7 +302,6 @@ export default function Matches() {
 
   // Left sidebar selection (placeholder state)
   const [search, setSearch] = useState("");
-  const [favorites, setFavorites] = useState(() => new Set());
 
   const teams = useMemo(
     () => [
@@ -367,6 +359,7 @@ export default function Matches() {
     return base.map((g) => {
       const filteredMatches = g.matches.filter((match) => {
         const matchDate = new Date(match.start_time);
+        console.log(match, "Checking match date:", matchDate, "against", dayStart, dayEnd);
         return matchDate >= dayStart && matchDate < dayEnd;
       });      
       return { ...g, matches: filteredMatches };
@@ -428,18 +421,10 @@ export default function Matches() {
     []
   );
 
-  function toggleFavorite(matchId) {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(matchId)) next.delete(matchId);
-      else next.add(matchId);
-      return next;
-    });
-  }
 
   return (
     <Container size="xl" fluid py="lg">
-      <Stack gap="md" pt="sm">
+      <Stack gap="md">
         {/* Top pills like the screenshot */}
         <SegmentedControl
           value={competition_type.comp_type}
@@ -657,7 +642,7 @@ export default function Matches() {
                         <Text size="sm" c="dimmed">No matches in this group for the selected filter.</Text>
                       ) : (
                         g.matches.map((m, i) => (
-                          <MatchRow key={i} match={m} isFav={favorites.has(m.id)} onToggleFav={toggleFavorite} />
+                          <MatchRow key={i} match={m} />
                         ))
                       )}
                       </Stack>

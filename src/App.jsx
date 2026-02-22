@@ -54,7 +54,7 @@ export default function App() {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Main>
+      <AppShell.Main pt="md">
         <Routes>
           <Route path="/" element={<Matches />} />
           

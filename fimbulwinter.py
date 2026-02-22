@@ -78,8 +78,8 @@ def return_match_details_by_mode(match: BaseMatch, mode: str) -> dict:
     if mode == 'short': return details
     elif mode == 'extended':
         try:
-            details.update({"current_question": match.get_current_question()})
-            details.update({"correct_answers": match.get_correct_answers()})
+            details.update({"question": match.get_current_question()})
+            details.update({"answers": match.get_correct_answers()})
         except ValueError as ve:
             if "current question" in str(ve).lower():
                 details.update({"current_question": {"error": str(ve)}})
