@@ -291,16 +291,14 @@ export default function MatchRoom() {
 
   // live question duration countdown
   const questionCountdownLabel = useMemo(() => {
-    if (!question?.duration) return null;
+    if (!question?.expiryDate) return null;
     if (qMode !== "question") return null;
-    const start = safeDate(startIso);
-    if (!start) return null;
+    const expiry = safeDate(question.expiryDate);
     const now = clockNow;
-    const elapsedMs = Math.max(0, now - start.getTime());
-    const remainingMs = Math.max(0, question.duration * 1000 - elapsedMs);
+    const remainingMs = Math.max(0, expiry?.getTime() - now);
     const remainingSeconds = Math.ceil(remainingMs / 1000);
     return `${remainingSeconds}s`;
-  }, [question, qMode, startIso, clockNow]);
+  }, [question, qMode, clockNow]);
 
   const scorersLines = useMemo(() => {
     const s = match?.scorers;
