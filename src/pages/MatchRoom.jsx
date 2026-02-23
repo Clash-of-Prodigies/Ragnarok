@@ -15,14 +15,15 @@ import {
   Title,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconRefresh, IconClock, IconNews } from "@tabler/icons-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { IconClock, IconNews } from "@tabler/icons-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 
 /* ---------- tiny helpers ---------- */
 
 function safeDate(v) {
+  if (v === null || v === undefined) return null;
   const d = new Date(v);
   return Number.isFinite(d.getTime()) ? d : null;
 }
@@ -257,12 +258,10 @@ export default function MatchRoom() {
 
   const [verifyResult, setVerifyResult] = useState(null);
 
-  const [eventLog, setEventLog] = useState(() => []);
-  const eventLogRef = useRef(eventLog);
-  eventLogRef.current = eventLog;
+  const [eventLog, setEventLog] = useState([]);
 
-  const homeName = match?.home_team || match?.home || "Home";
-  const awayName = match?.away_team || match?.away || "Away";
+  const homeName = match?.home_team ?? match?.home ?? "Home";
+  const awayName = match?.away_team ?? match?.away ?? "Away";
   const homeScore = match?.home_score ?? 0;
   const awayScore = match?.away_score ?? 0;
   const state = match?.state ?? 0;
@@ -372,12 +371,6 @@ export default function MatchRoom() {
     return { correctIndices: Array.from(new Set(correctIndices)), awardedLabel, metaLines };
   }, [verifyResult]);
 
-  function pushLog(text) {
-    const t = new Date();
-    const time = t.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-    setEventLog((prev) => [{ time, text }, ...prev].slice(0, 25));
-  }
-
   const refreshMatch = useCallback(async () => {
     setLoadingMatch(true);
     try {
@@ -401,17 +394,18 @@ export default function MatchRoom() {
     setFetchBusy(true);
     try {
       const data = await api.getCurrentQuestion(id);
-      setQuestion(data?.question || data);
+      if (!data) throw new Error("No question data received");
+      if (!data?.question) throw new Error("Malformed question data received");
+      if ('error' in data.question) throw new Error('Error fetching question: ' + (data.current_question.error || 'Unknown error'));
+      setQuestion(data?.question);
       setSelectedOption(null);
       setVerifyResult(null);
-      pushLog("Fetched current question");
       setQMode("question");
     } catch (e) {
       if (e instanceof ApiError) {
         const tryAt = extractTryAgainAt(e.message || "");
         if (tryAt) {
           setQTryAgainAt(tryAt);
-          pushLog("Question not ready yet, cooling down");
           return;
         }
       }
@@ -435,7 +429,6 @@ export default function MatchRoom() {
     try {
       await api.submitAnswer(id, selectedOption);
       notifications.show({ color: "green", message: "Answer submitted." });
-      pushLog(`Submitted answer, option ${selectedOption}`);
     } catch (e) {
       notifications.show({ color: "red", message: e?.message || "Submit failed" });
     } finally {
@@ -457,6 +450,30 @@ export default function MatchRoom() {
     const p = window.setInterval(() => refreshMatch(), 5000);
     return () => window.clearInterval(p);
   }, [match, state, refreshMatch]);
+
+  // update event log
+  useEffect(() => {
+    if (!match) return;
+    const newEvents = [];
+
+    // scorers
+    const scorers = Array.isArray(match?.scorers) ? match.scorers : [];
+    for (const s of scorers) {
+      if (!(s?.player_info)) continue; // skip if no player info, to avoid noisy unknown scorer entries until backend is fixed
+      const name = s.player_info?.user_name ?? "";
+      const team = s.player_info.user_affiliation ?? "";
+      const time = (() => {
+        const t = safeDate(s?.time_received ?? null);
+        const start = safeDate(startIso);
+        if (!t || !start) return "-";
+        const elapsedMs = t.getTime() - start.getTime();
+        const minutes = Math.floor(elapsedMs / 60000);
+        return `${minutes}`;
+      })();
+      newEvents.push({ time, text: `Goal by ${name} (${team})` });
+    }
+    setEventLog(newEvents);
+  }, [match, startIso]);
 
   const leftNews = useMemo(
     () => [
@@ -981,13 +998,8 @@ export default function MatchRoom() {
 
               <ScrollArea h={220} type="hover" scrollbarSize={6}>
                 <Stack gap="sm">
-                  {eventLog.length === 0 ? (
-                    <Text size="sm" c="dimmed">
-                      No events yet. Fetch a question or submit an answer to populate this.
-                    </Text>
-                  ) : (
-                    eventLog.map((e, idx) => <EventRow key={idx} time={e.time} text={e.text} />)
-                  )}
+                {eventLog.length === 0 ? (<Text size="sm" c="dimmed">No events to show</Text>)
+                : (eventLog.map((e, idx) => <EventRow key={idx} time={e.time} text={e.text} />))}
                 </Stack>
               </ScrollArea>
             </Card>
@@ -1181,13 +1193,8 @@ export default function MatchRoom() {
             <Divider my="sm" />
             <ScrollArea h={200} type="hover" scrollbarSize={6}>
               <Stack gap="sm">
-                {eventLog.length === 0 ? (
-                  <Text size="sm" c="dimmed">
-                    No events yet.
-                  </Text>
-                ) : (
-                  eventLog.map((e, idx) => <EventRow key={idx} time={e.time} text={e.text} />)
-                )}
+              {eventLog.length === 0 ? (<Text size="sm" c="dimmed">No events yet.</Text>)
+              : (eventLog.map((e, idx) => <EventRow key={idx} time={e.time} text={e.text} />))}
               </Stack>
             </ScrollArea>
           </Card>

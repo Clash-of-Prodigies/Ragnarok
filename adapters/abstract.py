@@ -57,11 +57,9 @@ class BaseQuestion:
 
     def from_dict_to_answer(self, ans:dict) -> Answer:
         player_info = ans.get('player_info', {})
-        time_received = ans.get('time_received', datetime.now(tz=timezone.utc))
-        if isinstance(time_received, str):
-            time_received = datetime.fromisoformat(time_received)
-        return self.Answer(player_info=player_info,
-                           time_received=time_received,)
+        current_time = datetime.now(tz=timezone.utc)
+        time_received = datetime.fromisoformat(current_time.isoformat())
+        return self.Answer(player_info=player_info, time_received=time_received,)
 
     def to_dict(self):
         sent_date = self.sendDate
@@ -87,7 +85,8 @@ class BaseMatch:
     def __init__(self, match_id:str, comp_info:dict[str, str],  home_team:str, away_team:str, home_score=0.0, away_score=0.0,
                 rounds=1, state=0, scorers:list|None=None,
                 qpr=5, tpq:list[float]|None=None, ppq:float=1,
-                start_time=None, end_time=None, cooldown_duration=10):
+                start_time=None, end_time=None, cooldown_duration=10,
+                logger=None):
         self.match_id: str = match_id
         self.comp_info: dict[str, str] = comp_info
         self.home_team: str = home_team
@@ -104,6 +103,7 @@ class BaseMatch:
         self.tpq:list[float] = [] if tpq is None else tpq  # time per question per round
         self.ppq:float = ppq  # points per question
         self.cooldown_duration:timedelta = timedelta(seconds=cooldown_duration)  # in seconds
+        self.logger = logger
 
         if not self.match_id:
             raise ValueError("Match ID cannot be empty")
@@ -129,6 +129,12 @@ class BaseMatch:
             self.end_time = end_time
         else:
             self.end_time = None
+
+    def log(self, level:str, message:str):
+        if self.logger:
+            log_func = getattr(self.logger, level, None)
+            if callable(log_func):
+                log_func(message)
 
     def to_dict(self):
         return {
@@ -367,6 +373,7 @@ class BaseMatch:
 
         # 5) Grade using all submitted answers (snapshot)
         all_answers = list(self.current_answers.values())
+        self.log("info", f"Verifying answers for question {q.question_id}. Total answers submitted: {len(all_answers)}")
         q_with_all = replace(q, answers=all_answers)
 
         correct_answers = q_with_all.pick_correct_answers()
@@ -377,7 +384,7 @@ class BaseMatch:
 
         # 6) Score + advance exactly once
         self._record_correct_answers(list(correct_answers), points=q_graded.points)
-        return 'Answers verified and recorded successfully'
+        return 'Answers verified and recorded successfully: ' + ', '.join([ans.player_info.get('user_name', 'Unknown') for ans in correct_answers])
     
     def _pause_match(self, recess:float = -1):
         if self.state != 2:
@@ -558,9 +565,11 @@ class BaseIndividualMatch(BaseMatch):
     def __init__(self, match_id, comp_info, home_team, away_team, home_score=0.0, away_score=0.0,
                 rounds=1, state=0, scorers=None,
                 qpr=5, tpq=None, ppq=5,
-                start_time=None, end_time=None,):
+                start_time=None, end_time=None,
+                logger=None):
         super().__init__(match_id=match_id, comp_info=comp_info, home_team=home_team, away_team=away_team,
                         home_score=home_score, away_score=away_score,
                         rounds=rounds, state=state, scorers=[] if scorers is None else scorers,
                         qpr=qpr, tpq=[] if tpq is None else tpq, ppq=ppq,
-                        start_time=start_time, end_time=end_time,)
+                        start_time=start_time, end_time=end_time,
+                        logger=logger)

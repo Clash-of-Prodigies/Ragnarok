@@ -29,7 +29,7 @@ async function request(path, kwargs, init) {
       )
     : [];
   const url = `${BASE}${path}${kwargsEntries.length ? "?" + kwargsEntries.join("&") : ""}`;
-  const res = await fetch(url, { ...init, headers });
+  const res = await fetch(url, { ...init, headers, });
 
   const text = await res.text();
   let body = null;
@@ -52,14 +52,14 @@ export const api = {
   getMatch: (matchId) => request(`/matches/${encodeURIComponent(matchId)}`),
 
   getCurrentQuestion: (matchId) =>
-    request(`/matches/${encodeURIComponent(matchId)}?mode=extended`),
+    request(`/matches/${encodeURIComponent(matchId)}`, { mode: "extended" }),
 
   submitAnswer: (matchId, selectedOption) =>
-    request(`/matches/${encodeURIComponent(matchId)}`, {
+    request(`/matches/${encodeURIComponent(matchId)}`, {}, {
       method: "POST",
       body: JSON.stringify({ selected_option: selectedOption }),
     }),
 
   verifyAnswers: (matchId) =>
-    request(`/matches/${encodeURIComponent(matchId)}?mode=extended`),
+    request(`/matches/${encodeURIComponent(matchId)}`, { mode: "extended", }),
 };

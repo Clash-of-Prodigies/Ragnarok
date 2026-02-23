@@ -98,7 +98,7 @@ def add_match(match_id='', **kwargs):
         if not home or not away: return jsonify({"error": "home_team and away_team are required"}), 400
         if fimbulwinter.lookup_match_by_id(match_id, ALL_MATCHES, silent=True) != -1:
             return jsonify({"error": "Match with this ID already exists"}), 400
-        match = adapter(kwargs=data)
+        match = adapter(logger=app.logger, kwargs=data)
         ALL_MATCHES.append(match)
     except KeyError as ke:
         return jsonify({"error": f"Missing required field: {ke}"}), 400

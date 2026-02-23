@@ -82,9 +82,9 @@ def return_match_details_by_mode(match: BaseMatch, mode: str) -> dict:
             details.update({"answers": match.get_correct_answers()})
         except ValueError as ve:
             if "current question" in str(ve).lower():
-                details.update({"current_question": {"error": str(ve)}})
+                details.update({"question": {"error": str(ve)}})
             elif "cannot verify" in str(ve).lower():
-                details.update({"correct_answers": {"error": str(ve)}})
+                details.update({"answers": {"error": str(ve)}})
             else: raise ve
         except Exception as e: raise e
         finally: return details

@@ -7,6 +7,7 @@ from .abstract import BaseIndividualMatch, BaseQuestion
 from dataclasses import dataclass, field
 from collections.abc import Sequence
 from datetime import datetime, timedelta
+from logging import Logger
 
 @dataclass(frozen=True)
 class MultiChoiceQuestion(BaseQuestion):
@@ -19,15 +20,13 @@ class MultiChoiceQuestion(BaseQuestion):
     answers: list[Answer] = field(default_factory=list)
 
     def from_dict_to_answer(self, ans: dict) -> Answer:
-        base_answer = super().from_dict_to_answer(ans)
+        player_info = ans.get('player_info', {})
         selected_option = ans.get('selected_option', -1)
-        return self.Answer(player_info=base_answer.player_info, selected_option=selected_option,)
+        return self.Answer(player_info=player_info, selected_option=selected_option,)
     
     def to_dict(self):
         question_details = super().to_dict()
-        question_details.update({
-            "options": self.options,
-        })
+        question_details.update({ "options": self.options, })
         return question_details
     
     def pick_correct_answers(self):
@@ -35,7 +34,7 @@ class MultiChoiceQuestion(BaseQuestion):
         return correct_answers
 
 class HouseBamzyMatch(BaseIndividualMatch):
-    def __init__(self, kwargs:dict):
+    def __init__(self, logger:Logger, kwargs:dict):
         match_id = kwargs.get('match_id', '')
         comp_info = kwargs.get('comp_info', {})
         home_team = kwargs.get('home_team', '')
@@ -52,7 +51,8 @@ class HouseBamzyMatch(BaseIndividualMatch):
         super().__init__(match_id=match_id, comp_info=comp_info, home_team=home_team, away_team=away_team,
                 home_score=home_score, away_score=away_score,
                 rounds=rounds, state=state, scorers=scorers, tpq=tpq, ppq=ppq,
-                start_time=start_time, end_time=end_time)
+                start_time=start_time, end_time=end_time,
+                logger=logger)
         self.RecessDuration:float = 120.0  # in seconds
         self.PPW:float = 50.0 # Points Per Win
         self.W2S:float = 5.0 # Within 2 Seconds Bonus
