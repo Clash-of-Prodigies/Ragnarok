@@ -64,15 +64,15 @@ class BaseQuestion:
     def to_dict(self):
         sent_date = self.sendDate
         duration = self.duration
-        sent_date_iso = ''
-        duration_seconds = duration.total_seconds() if isinstance(duration, timedelta) else 10
+        sent_date_iso = expiry_date_iso = ''
         if sent_date and isinstance(sent_date, datetime):
             sent_date_iso = sent_date.isoformat()
+            expiry_date_iso = (sent_date + duration).isoformat() if isinstance(duration, timedelta) else ''
         return {
             "id": self.question_id,
             "text": self.text,
             "sentDate": sent_date_iso,
-            "duration": duration_seconds,
+            "expiryDate": expiry_date_iso,
         }
     
     def pick_correct_answers(self) -> list[Answer]:

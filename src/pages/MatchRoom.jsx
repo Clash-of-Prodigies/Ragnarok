@@ -289,6 +289,19 @@ export default function MatchRoom() {
     return `${minutes}:${pad2(seconds)}`;
   }, [state, startIso, clockNow]);
 
+  // live question duration countdown
+  const questionCountdownLabel = useMemo(() => {
+    if (!question?.duration) return null;
+    if (qMode !== "question") return null;
+    const start = safeDate(startIso);
+    if (!start) return null;
+    const now = clockNow;
+    const elapsedMs = Math.max(0, now - start.getTime());
+    const remainingMs = Math.max(0, question.duration * 1000 - elapsedMs);
+    const remainingSeconds = Math.ceil(remainingMs / 1000);
+    return `${remainingSeconds}s`;
+  }, [question, qMode, startIso, clockNow]);
+
   const scorersLines = useMemo(() => {
     const s = match?.scorers;
     if (!Array.isArray(s) || s.length === 0) return [];
@@ -475,6 +488,23 @@ export default function MatchRoom() {
     setEventLog(newEvents);
   }, [match, startIso]);
 
+  // Question options normalization (to handle different backend payload shapes)
+  const questionOptions = useMemo(() => {
+    if (!question) return [];
+    if (Array.isArray(question.options)) return question.options;
+    if (question.options && typeof question.options === "string") {
+      try {
+        const delimiter = question.options.includes("|") ? "|" : ",";
+        const opts = question.options.split(delimiter).map((x) => x.trim());
+        if (Array.isArray(opts)) return opts;
+      } catch {
+        // ignore parse error
+      }
+    }
+    return [];
+  }, [question]);
+
+
   const leftNews = useMemo(
     () => [
       {
@@ -546,9 +576,9 @@ export default function MatchRoom() {
             {question?.text || "Fetch the current question to begin."}
           </Text>
 
-          {Array.isArray(question?.options) && question.options.length ? (
+          {Array.isArray(questionOptions) && questionOptions.length ? (
             <Stack gap="sm">
-              {question.options.map((opt, idx) => {
+              {questionOptions.map((opt, idx) => {
                 const selected = selectedOption === idx;
                 const isCorrect = qMode === "results" && verifySummary.correctIndices.includes(idx);
 
@@ -1143,9 +1173,9 @@ export default function MatchRoom() {
 
                     <Group gap="sm" c="dimmed">
                       <Text size="sm">
-                        Match time:{" "}
+                        Time Left:{" "}
                         <Text span fw={900} c={toStateNumber(state) === 2 ? "red" : undefined}>
-                          {liveClockLabel}
+                          {questionCountdownLabel}
                         </Text>
                       </Text>
                     </Group>

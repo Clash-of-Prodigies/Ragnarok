@@ -26,7 +26,7 @@ class MultiChoiceQuestion(BaseQuestion):
     
     def to_dict(self):
         question_details = super().to_dict()
-        question_details.update({ "options": self.options, })
+        question_details.update({ "options": ','.join(self.options), })
         return question_details
     
     def pick_correct_answers(self):
