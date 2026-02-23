@@ -294,8 +294,7 @@ export default function MatchRoom() {
     if (!question?.expiryDate) return null;
     if (qMode !== "question") return null;
     const expiry = safeDate(question.expiryDate);
-    const now = clockNow;
-    const remainingMs = Math.max(0, expiry?.getTime() - now);
+    const remainingMs = Math.max(0, expiry?.getTime() - clockNow);
     const remainingSeconds = Math.ceil(remainingMs / 1000);
     return `${remainingSeconds}s`;
   }, [question, qMode, clockNow]);
